@@ -206,7 +206,11 @@ impl MessageEntry {
                 let thumbnail = Some(AdditionalData::Photo {
                     thumbnail: ph.photo.minithumbnail.as_ref().unwrap().data.clone(),
                 });
-                vec![(thumbnail, Line::from("📷 Photo"))]
+                let mut v = vec![(thumbnail, Line::from("📷 Photo"))];
+                if !ph.caption.text.is_empty() {
+                    v.push((None, Line::from(ph.caption.text.clone())));
+                }
+                v
             }
             MessageContent::MessageSticker(_) => vec![(None, Line::from("🎨 Sticker"))],
             MessageContent::MessageVideo(_) => vec![(None, Line::from("🎥 Video"))],

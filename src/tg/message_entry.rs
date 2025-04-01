@@ -34,10 +34,15 @@ impl DateTimeEntry {
 }
 
 #[derive(Debug, Clone)]
+pub enum AdditionalData {
+    Photo { thumbnail: String },
+}
+
+#[derive(Debug, Clone)]
 pub struct MessageEntry {
     id: i64,
     sender_id: TdMessageSender,
-    message_content: Vec<Line<'static>>,
+    message_content: Vec<(Option<AdditionalData>, Line<'static>)>,
     reply_to: Option<TdMessageReplyTo>,
     timestamp: DateTimeEntry,
     is_edited: bool,
@@ -62,7 +67,7 @@ impl MessageEntry {
     pub fn message_content_to_string(&self) -> String {
         self.message_content
             .iter()
-            .map(|l| l.iter().map(|s| s.content.clone()).collect::<String>())
+            .map(|(_, l)| l.iter().map(|s| s.content.clone()).collect::<String>())
             .collect::<Vec<String>>()
             .join("\n")
     }
@@ -190,35 +195,42 @@ impl MessageEntry {
         entry
     }
 
-    fn message_content_lines(content: &MessageContent) -> Vec<Line<'static>> {
+    fn message_content_lines(
+        content: &MessageContent,
+    ) -> Vec<(Option<AdditionalData>, Line<'static>)> {
         match content {
             MessageContent::MessageText(m) => Self::format_message_content(&m.text),
-            MessageContent::MessageAudio(_) => vec![Line::from("🎵 Audio")],
-            MessageContent::MessagePhoto(_) => vec![Line::from("📷 Photo")],
-            MessageContent::MessageSticker(_) => vec![Line::from("🎨 Sticker")],
-            MessageContent::MessageVideo(_) => vec![Line::from("🎥 Video")],
-            MessageContent::MessageAnimation(_) => vec![Line::from("🎞️ Animation")],
-            MessageContent::MessageVoiceNote(_) => vec![Line::from("🎤 Voice Note")],
-            MessageContent::MessageDocument(_) => vec![Line::from("📄 Document")],
-            _ => vec![Line::from("")],
+            MessageContent::MessageAudio(_) => vec![(None, Line::from("🎵 Audio"))],
+            MessageContent::MessagePhoto(ph) => {
+                let thumbnail = Some(AdditionalData::Photo {
+                    thumbnail: ph.photo.minithumbnail.as_ref().unwrap().data.clone(),
+                });
+                vec![(thumbnail, Line::from("📷 Photo"))]
+            }
+            MessageContent::MessageSticker(_) => vec![(None, Line::from("🎨 Sticker"))],
+            MessageContent::MessageVideo(_) => vec![(None, Line::from("🎥 Video"))],
+            MessageContent::MessageAnimation(_) => vec![(None, Line::from("🎞️ Animation"))],
+            MessageContent::MessageVoiceNote(_) => vec![(None, Line::from("🎤 Voice Note"))],
+            MessageContent::MessageDocument(_) => vec![(None, Line::from("📄 Document"))],
+            _ => vec![(None, Line::from(""))],
         }
     }
 
-    fn from_span_to_lines(span: Span) -> Vec<Line<'static>> {
+    fn from_span_to_lines(span: Span) -> Vec<(Option<AdditionalData>, Line<'static>)> {
         span.content
             .split('\n')
-            .map(|s| Line::from(Span::styled(s.to_owned(), span.style)))
-            .collect::<Vec<Line>>()
+            .map(|s| (None, Line::from(Span::styled(s.to_owned(), span.style))))
+            .collect::<Vec<(Option<AdditionalData>, Line)>>()
     }
 
-    fn from_spans_to_lines(spans: Vec<Span>) -> Vec<Line<'static>> {
+    fn from_spans_to_lines(spans: Vec<Span>) -> Vec<(Option<AdditionalData>, Line<'static>)> {
         let vec = spans
             .iter()
             .filter(|s| !s.content.is_empty())
             .flat_map(|s| Self::from_span_to_lines(s.clone()))
-            .collect::<Vec<Line>>();
+            .collect::<Vec<(Option<AdditionalData>, Line)>>();
         if vec.is_empty() {
-            vec![Line::from("")]
+            vec![(None, Line::from(""))]
         } else {
             vec
         }
@@ -243,7 +255,7 @@ impl MessageEntry {
             // No wrap
             self.message_content
                 .iter()
-                .map(|l| {
+                .map(|(_, l)| {
                     l.iter()
                         .map(|s| {
                             Span::styled(
@@ -260,7 +272,7 @@ impl MessageEntry {
             let mut current_line = Line::default();
             let mut current_line_length = 0;
             // for span in self.message_content.iter().flat_map(|l| l.iter()) {
-            for span in self.message_content.iter().flat_map(|l| l.iter()) {
+            for span in self.message_content.iter().flat_map(|(_, l)| l.iter()) {
                 for c in span.content.chars() {
                     if c == ' ' && current_line_length >= wrap_width {
                         lines.push(current_line);
@@ -281,7 +293,9 @@ impl MessageEntry {
         }
     }
 
-    fn format_message_content(message: &FormattedText) -> Vec<Line<'static>> {
+    fn format_message_content(
+        message: &FormattedText,
+    ) -> Vec<(Option<AdditionalData>, Line<'static>)> {
         let text = &message.text;
         let entities = &message.entities;
 

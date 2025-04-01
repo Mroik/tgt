@@ -195,6 +195,7 @@ impl MessageEntry {
         entry
     }
 
+    // TODO Draw image on chat window draw
     fn message_content_lines(
         content: &MessageContent,
     ) -> Vec<(Option<AdditionalData>, Line<'static>)> {

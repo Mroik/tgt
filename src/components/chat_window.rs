@@ -212,6 +212,7 @@ impl Component for ChatWindow {
         }
     }
 
+    // TODO Draw images
     fn draw(&mut self, frame: &mut ratatui::Frame<'_>, area: Rect) -> std::io::Result<()> {
         if !self.focused {
             self.message_list_state.select(None);

@@ -14,6 +14,7 @@ pub mod components;
 pub mod configs;
 pub mod run;
 pub mod tg;
+pub mod widgets;
 
 use crate::app_context::AppContext;
 use crate::app_error::AppError;

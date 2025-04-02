@@ -239,7 +239,7 @@ impl Component for ChatWindow {
         };
 
         let mut is_unread_outbox = true;
-        let mut is_unread_inbox = true;
+        let mut is_unread_inbox = true; // Seems to be unused
         let wrap_width = (area.width / 2) as i32;
         let items = self.message_list.iter().map(|message_entry| {
             let (myself, name_style, content_style, alignment) = if message_entry.sender_id()

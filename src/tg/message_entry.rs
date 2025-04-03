@@ -67,9 +67,25 @@ impl MessageEntry {
     pub fn message_content_to_string(&self) -> String {
         self.message_content
             .iter()
+            .filter(|(c, _)| c.is_none())
             .map(|(_, l)| l.iter().map(|s| s.content.clone()).collect::<String>())
             .collect::<Vec<String>>()
             .join("\n")
+    }
+
+    pub fn photos(&self) -> Vec<String> {
+        self.message_content
+            .iter()
+            .filter(|(c, _)| match c {
+                Some(AdditionalData::Photo { thumbnail: _ }) => true,
+                None => false,
+            })
+            .map(|(c, _)| match c {
+                Some(AdditionalData::Photo { thumbnail }) => thumbnail,
+                None => unreachable!(),
+            })
+            .cloned()
+            .collect()
     }
 
     pub fn set_message_content(&mut self, content: &MessageContent) {
@@ -260,6 +276,7 @@ impl MessageEntry {
             // No wrap
             self.message_content
                 .iter()
+                .filter(|(c, _)| c.is_none())
                 .map(|(_, l)| {
                     l.iter()
                         .map(|s| {
@@ -277,7 +294,12 @@ impl MessageEntry {
             let mut current_line = Line::default();
             let mut current_line_length = 0;
             // for span in self.message_content.iter().flat_map(|l| l.iter()) {
-            for span in self.message_content.iter().flat_map(|(_, l)| l.iter()) {
+            for span in self
+                .message_content
+                .iter()
+                .filter(|(c, _)| c.is_none())
+                .flat_map(|(_, l)| l.iter())
+            {
                 for c in span.content.chars() {
                     if c == ' ' && current_line_length >= wrap_width {
                         lines.push(current_line);

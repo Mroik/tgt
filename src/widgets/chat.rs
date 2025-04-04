@@ -99,14 +99,15 @@ impl<'a> Chat<'a> {
 impl StatefulWidget for Chat<'_> {
     type State = ChatState;
 
+    // TODO Render on proper offset
     fn render(mut self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        if area.x == 0 || area.y == 0 {
+            return;
+        }
+
         let end = area.y;
         let mut current = area.y + area.height - 1;
         for item in self.items.iter_mut() {
-            if current < end {
-                return;
-            }
-
             if let Some(t) = item.text.as_ref() {
                 if current - (t.height() as u16) < end {
                     return;
@@ -119,10 +120,6 @@ impl StatefulWidget for Chat<'_> {
             }
 
             for image in item.images.iter_mut() {
-                if current < end {
-                    return;
-                }
-
                 if current - MAX_IMAGE_HEIGHT < end {
                     return;
                 }

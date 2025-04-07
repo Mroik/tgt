@@ -42,10 +42,11 @@ pub enum AdditionalData {
 pub struct MessageEntry {
     id: i64,
     sender_id: TdMessageSender,
-    message_content: Vec<(Option<AdditionalData>, Line<'static>)>,
+    message_content: Vec<Line<'static>>,
     reply_to: Option<TdMessageReplyTo>,
     timestamp: DateTimeEntry,
     is_edited: bool,
+    photos: Vec<String>,
 }
 
 impl MessageEntry {
@@ -67,29 +68,34 @@ impl MessageEntry {
     pub fn message_content_to_string(&self) -> String {
         self.message_content
             .iter()
-            .filter(|(c, _)| c.is_none())
-            .map(|(_, l)| l.iter().map(|s| s.content.clone()).collect::<String>())
+            .map(|l| l.iter().map(|s| s.content.clone()).collect::<String>())
             .collect::<Vec<String>>()
             .join("\n")
     }
 
-    pub fn photos(&self) -> Vec<String> {
-        self.message_content
-            .iter()
-            .filter(|(c, _)| match c {
-                Some(AdditionalData::Photo { thumbnail: _ }) => true,
-                None => false,
-            })
-            .map(|(c, _)| match c {
-                Some(AdditionalData::Photo { thumbnail }) => thumbnail,
-                None => unreachable!(),
-            })
-            .cloned()
-            .collect()
+    pub fn photos(&self) -> &[String] {
+        &self.photos
     }
 
     pub fn set_message_content(&mut self, content: &MessageContent) {
-        self.message_content = Self::message_content_lines(content);
+        let ll = Self::message_content_lines(content);
+        self.message_content = ll
+            .iter()
+            .filter(|(a, _)| a.is_none())
+            .map(|(_, a)| a)
+            .cloned()
+            .collect();
+        self.photos = ll
+            .iter()
+            .filter(|(a, _)| match a {
+                Some(AdditionalData::Photo { thumbnail: _ }) => true,
+                None => false,
+            })
+            .map(|(a, _)| match a.as_ref().unwrap() {
+                AdditionalData::Photo { thumbnail } => thumbnail,
+            })
+            .cloned()
+            .collect();
     }
 
     pub fn set_is_edited(&mut self, is_edited: bool) {
@@ -276,8 +282,7 @@ impl MessageEntry {
             // No wrap
             self.message_content
                 .iter()
-                .filter(|(c, _)| c.is_none())
-                .map(|(_, l)| {
+                .map(|l| {
                     l.iter()
                         .map(|s| {
                             Span::styled(
@@ -294,12 +299,7 @@ impl MessageEntry {
             let mut current_line = Line::default();
             let mut current_line_length = 0;
             // for span in self.message_content.iter().flat_map(|l| l.iter()) {
-            for span in self
-                .message_content
-                .iter()
-                .filter(|(c, _)| c.is_none())
-                .flat_map(|(_, l)| l.iter())
-            {
+            for span in self.message_content.iter().flat_map(|l| l.iter()) {
                 for c in span.content.chars() {
                     if c == ' ' && current_line_length >= wrap_width {
                         lines.push(current_line);
@@ -454,13 +454,31 @@ impl MessageEntry {
 }
 impl From<&tdlib_rs::types::Message> for MessageEntry {
     fn from(message: &tdlib_rs::types::Message) -> Self {
+        let temp = Self::message_content_lines(&message.content);
+        let photos = temp
+            .iter()
+            .filter(|(a, _)| match a {
+                Some(AdditionalData::Photo { thumbnail: _ }) => true,
+                None => false,
+            })
+            .cloned()
+            .map(|(a, _)| match a.unwrap() {
+                AdditionalData::Photo { thumbnail } => thumbnail,
+            })
+            .collect();
+        let message_content = temp
+            .iter()
+            .filter(|(a, _)| a.is_none())
+            .map(|(_, a)| a)
+            .cloned()
+            .collect();
         Self {
             id: message.id,
             sender_id: match &message.sender_id {
                 MessageSender::User(user) => TdMessageSender::User(user.user_id),
                 MessageSender::Chat(chat) => TdMessageSender::Chat(chat.chat_id),
             },
-            message_content: Self::message_content_lines(&message.content),
+            message_content,
             reply_to: match &message.reply_to {
                 Some(reply) => match reply {
                     MessageReplyTo::Message(message) => {
@@ -474,6 +492,7 @@ impl From<&tdlib_rs::types::Message> for MessageEntry {
                 timestamp: message.date,
             },
             is_edited: message.edit_date != 0,
+            photos,
         }
     }
 }
